@@ -233,25 +233,94 @@ export function extractDescription($: CheerioAPI, jsonLd?: any): string {
 }
 
 /**
- * Extracts all job data using a Cheerio instance
- * 
+ * Extract job data from HTML
  * @param $ Cheerio instance
- * @param url Original URL for fallbacks
- * @returns Structured job data
+ * @param url URL of the job posting
+ * @returns Extracted job data
  */
-export function extractJobData($: CheerioAPI, url: string): ScrapedData {
-  // Extract JSON-LD first as it's often the most reliable
-  const jsonLd = extractJsonLd($);
-  
-  // Extract each piece of data
-  const title = extractTitle($, jsonLd);
-  const company = extractCompany($, url, jsonLd);
-  const description = extractDescription($, jsonLd);
-  
+export function extractJobData($: any, url: string): ScrapedData {
+  try {
+    // Try to extract title from common selectors
+    const title = 
+      $('h1').first().text() ||
+      $('title').text().split('|')[0] ||
+      $('title').text().split('-')[0] ||
+      'Unknown Position';
+    
+    // Try to extract company name
+    let company = '';
+    $('.company, .employer, [itemprop="hiringOrganization"], [data-company]').each((_: number, el: any) => {
+      if (!company) {
+        company = $(el).text().trim();
+      }
+    });
+    
+    // Fallback to title tag's second part
+    if (!company) {
+      const titleParts = $('title').text().split(/[\|\-]/);
+      if (titleParts.length > 1) {
+        company = titleParts[1].trim();
+      }
+    }
+    
+    // Fallback to unknown
+    if (!company) {
+      company = 'Unknown Company';
+    }
+    
+    // Extract job description - look for common containers
+    let description = '';
+    $('.description, .job-description, [itemprop="description"]').each((_: number, el: any) => {
+      if (!description) {
+        description = $(el).text().trim();
+      }
+    });
+    
+    // Fallback to largest text container
+    if (!description) {
+      let maxLength = 0;
+      $('div, section, article').each((_: number, el: any) => {
+        const text = $(el).text().trim();
+        if (text.length > maxLength && text.length > 200) {
+          maxLength = text.length;
+          description = text;
+        }
+      });
+    }
+    
+    return {
+      title: title.trim(),
+      company: company,
+      description: description,
+      url: url,
+      scraper: "Generic" // This will be overridden by the specific scraper
+    };
+  } catch (error) {
+    console.error('Error extracting job data:', error);
+    return {
+      title: 'Unknown Position',
+      company: 'Unknown Company',
+      description: 'Failed to extract job description',
+      url: url,
+      scraper: "Generic"
+    };
+  }
+}
+
+/**
+ * Clean and normalize job data
+ * @param data Job data to clean
+ * @returns Cleaned job data
+ */
+export function cleanJobData(data: ScrapedData): ScrapedData {
   return {
-    title,
-    company,
-    description
+    ...data,
+    title: data.title.replace(/\s+/g, ' ').trim(),
+    company: data.company.replace(/\s+/g, ' ').trim(),
+    description: data.description.replace(/\s+/g, ' ').trim(),
+    // Keep existing url and scraper fields
+    url: data.url,
+    scraper: data.scraper
   };
 }
 
@@ -318,15 +387,16 @@ export function validateJobData(
 }
 
 /**
- * Cleans and formats job data for consistent output
- * 
- * @param data Job data to clean
- * @returns Cleaned job data
+ * Clean text by removing extra whitespace, newlines, etc.
+ * @param text Text to clean
+ * @returns Cleaned text
  */
-export function cleanJobData(data: ScrapedData): ScrapedData {
-  return {
-    title: data.title.replace(/\s+/g, ' ').trim(),
-    company: data.company.replace(/\s+/g, ' ').trim(),
-    description: data.description.replace(/\s+/g, ' ').trim()
-  };
+export function cleanText(text: string): string {
+  if (!text) return '';
+  
+  return text
+    .replace(/\s+/g, ' ')     // Replace multiple whitespace with single space
+    .replace(/\n+/g, ' ')     // Replace newlines with spaces
+    .replace(/\t+/g, ' ')     // Replace tabs with spaces
+    .trim();
 }

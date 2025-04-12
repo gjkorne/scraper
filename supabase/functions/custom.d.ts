@@ -17,7 +17,7 @@ declare module "npm:cheerio@*" {
 
 // Deno namespace
 declare namespace Deno {
-  export function env: {
+  export const env: {
     get(key: string): string | undefined;
     set(key: string, value: string): void;
     toObject(): Record<string, string>;
