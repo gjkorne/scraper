@@ -9,21 +9,28 @@ export interface ScrapedData {
   title: string;
   company: string;
   description: string;
+  location?: string;
+  salary?: string;
+  jobType?: string;
+  datePosted?: string;
+  industry?: string;
+  url: string;
+  scraper: string;
+  keywords?: string[];
+  skills?: string[];
+  requirements?: string[];
+  benefits?: string[];
+  rawHtml?: string;
+  error?: string;
+  metadata?: Record<string, any>;
 }
 
 /**
- * HTTP headers for scraping requests
+ * HTTP headers for the scraper requests
  */
 export interface ScraperHeaders {
+  [key: string]: string;
   'User-Agent': string;
-  'Accept': string;
-  'Accept-Language': string;
-  'Referer': string;
-  'DNT': string;
-  'Connection': string;
-  'Upgrade-Insecure-Requests': string;
-  'Cache-Control'?: string;
-  'Pragma'?: string;
 }
 
 /**

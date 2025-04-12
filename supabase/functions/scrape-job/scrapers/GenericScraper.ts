@@ -1,6 +1,5 @@
 import { BaseScraper } from "./BaseScraper.ts";
 import { ScrapedData } from "../types/index.ts";
-import { CheerioAPI } from "npm:cheerio@1.0.0-rc.12";
 import { extractJobData } from "../utils/html.ts";
 
 /**
@@ -23,7 +22,7 @@ export class GenericScraper extends BaseScraper {
   /**
    * Generic implementation uses the common extraction utilities
    */
-  protected async extractData($: CheerioAPI, url: string): Promise<ScrapedData> {
+  protected async extractData($: any, url: string): Promise<ScrapedData> {
     return extractJobData($, url);
   }
 }

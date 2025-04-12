@@ -1,5 +1,6 @@
-import { Scraper, ScrapedData } from "../types/index.ts";
-import { fetchWithRetry, isValidUrl, createError } from "../utils/fetch.ts";
+import { Scraper, ScrapedData, ScraperHeaders } from "../types/index.ts";
+import { isValidUrl } from "../utils/url.ts";
+import { fetchWithRetry, createError } from "../utils/fetch.ts";
 import { 
   parseHtml, 
   extractJobData, 
@@ -7,6 +8,8 @@ import {
   cleanJobData 
 } from "../utils/html.ts";
 import { scraperCache, CacheOptions } from "../utils/cache.ts";
+import { globalRateLimiter } from "../utils/rate-limit.ts";
+import { monitor } from "../utils/monitoring.ts";
 
 /**
  * Base scraper class that implements common functionality
@@ -55,42 +58,55 @@ export abstract class BaseScraper implements Scraper {
    * @returns Scraped job data
    */
   async scrape(url: string, options?: { bypass_cache?: boolean }): Promise<ScrapedData> {
+    if (!this.canHandle(url)) {
+      throw new Error(`Scraper ${this.name} cannot handle URL: ${url}`);
+    }
+    
+    // Merge provided options with defaults
+    const scrapeOptions = {
+      bypass_cache: options?.bypass_cache || this.cacheOptions.bypass_cache,
+    };
+    
+    const startTime = Date.now();
+    let cacheHit = false;
+    
     try {
-      // Validate URL
-      if (!isValidUrl(url)) {
-        throw new Error(JSON.stringify(createError(
-          'INVALID_URL',
-          'Invalid URL format',
-          `URL: ${url}`,
-          'Please provide a valid job posting URL'
-        )));
-      }
-      
-      // Determine if we should bypass cache
-      const bypass_cache = options?.bypass_cache ?? this.cacheOptions.bypass_cache;
-      
-      // Check cache if enabled
-      if (!bypass_cache && scraperCache.isReady()) {
+      // Check cache first unless bypass is requested
+      if (!scrapeOptions.bypass_cache && scraperCache.isReady()) {
         const cachedData = await scraperCache.get(url, { 
           ...this.cacheOptions,
-          bypass_cache
+          bypass_cache: scrapeOptions.bypass_cache
         });
         
         if (cachedData && !cachedData.is_expired) {
           console.log(`${this.name}: Using cached data for ${url} (hit count: ${cachedData.cache_hit_count})`);
+          cacheHit = true;
+          monitor.recordCacheAccess(true);
           return cachedData.content;
+        } else {
+          monitor.recordCacheAccess(false);
         }
       }
       
-      // Cache miss or bypass, fetch the page
-      console.log(`${this.name}: Cache miss or bypass for ${url}, fetching fresh data`);
+      console.log(`Scraping ${url} with ${this.name} scraper`);
+      
+      // Apply rate limiting before making the request
+      const rateLimitStart = Date.now();
+      await globalRateLimiter.waitForRateLimit(url);
+      const waitTime = Date.now() - rateLimitStart;
+      
+      if (waitTime > 10) { // Only record if we actually waited
+        monitor.recordRateLimit(waitTime);
+      }
+      
+      // Fetch the page content
       const response = await this.fetchPage(url);
       const html = await response.text();
       
-      // Parse HTML and extract data
+      // Parse the HTML
       const $ = parseHtml(html);
       
-      // Allow scraper-specific extraction logic
+      // Extract job data
       let data = await this.extractData($, url);
       
       // If scraper-specific extraction fails, fall back to generic extraction
@@ -103,33 +119,38 @@ export abstract class BaseScraper implements Scraper {
       data = validateJobData(data, url, html);
       data = cleanJobData(data);
       
-      // Store successful result in cache
-      if (scraperCache.isReady() && !bypass_cache) {
-        // Extract relevant headers for cache validation
-        const headers: Record<string, string> = {};
-        if (response.headers.has('etag')) {
-          headers['etag'] = response.headers.get('etag')!;
+      // Populate scraper metadata
+      data.scraper = this.name;
+      data.url = url;
+      
+      // Store in cache if not bypassing
+      if (!scrapeOptions.bypass_cache && scraperCache.isReady()) {
+        try {
+          await scraperCache.set(
+            url, 
+            data, 
+            this.name, 
+            this.cacheOptions,
+            response.status,
+            Object.fromEntries(response.headers.entries())
+          );
+          console.log(`${this.name}: Stored data in cache for ${url}`);
+        } catch (error) {
+          console.error("Error storing cache:", error);
+          monitor.recordCacheAccess(false, true); // Record cache error
+          // Continue even if caching fails
         }
-        if (response.headers.has('last-modified')) {
-          headers['last-modified'] = response.headers.get('last-modified')!;
-        }
-        
-        await scraperCache.set(
-          url, 
-          data, 
-          this.name, 
-          this.cacheOptions,
-          response.status,
-          headers
-        );
-        console.log(`${this.name}: Stored data in cache for ${url}`);
       }
       
       return data;
     } catch (error) {
-      // Enhance the error with scraper name
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new Error(`${this.name}: ${errorMessage}`);
+      console.error(`Error scraping ${url} with ${this.name} scraper:`, error);
+      throw error;
+    } finally {
+      const duration = Date.now() - startTime;
+      if (!cacheHit) { // Don't record scraper metrics for cache hits
+        monitor.recordScrape(this.name, duration, true, url);
+      }
     }
   }
   
