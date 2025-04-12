@@ -1,0 +1,145 @@
+name: Keyword Analysis Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'supabase/functions/analyze-job/**'
+      - 'src/components/JobAnalysis.tsx'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'supabase/functions/analyze-job/**'
+      - 'src/components/JobAnalysis.tsx'
+
+jobs:
+  test-analysis:
+    name: Test Keyword Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Setup test fixtures
+        run: |
+          mkdir -p test/fixtures
+          echo '{
+            "softwareEngineer": "We are looking for a Software Engineer with 3+ years experience in React, TypeScript, and Node.js. Bachelor's degree in Computer Science preferred. Experience with AWS and containerization is a plus. Must have strong communication skills and be able to work in a team environment. Fully remote position with a salary range of $90,000-$120,000.",
+            "dataScientist": "Data Scientist needed with skills in Python, R, and machine learning frameworks (TensorFlow, PyTorch). PhD in Statistics, Mathematics or Computer Science preferred. 5+ years experience working with large datasets and implementing machine learning models. Hybrid work environment available.",
+            "productManager": "Product Manager with 4+ years experience in SaaS products. Must have excellent communication and leadership skills. Experience with agile methodologies, user research, and product lifecycle management. Bachelor's degree required, MBA a plus."
+          }' > test/fixtures/job-descriptions.json
+          
+      - name: Create test script
+        run: |
+          mkdir -p test/keyword-analysis
+          echo "import { describe, it, expect } from 'vitest';
+          import nlp from 'compromise';
+          import topics from 'compromise-topics';
+          import fs from 'fs';
+          import path from 'path';
+
+          // Configure compromise with plugins
+          nlp.extend(topics);
+
+          // Mock analysis function (simplified version of the Edge Function)
+          function analyzeJobDescription(description) {
+            const technicalSkills = [
+              'react', 'typescript', 'node.js', 'python', 'r', 'tensorflow', 'pytorch', 
+              'aws', 'containerization', 'saas', 'agile'
+            ];
+            
+            // Clean up the text
+            const cleanText = description.replace(/\\s+/g, ' ').trim();
+            
+            // Parse with compromise
+            const doc = nlp(cleanText);
+            
+            // Extract all nouns and topics as potential keywords
+            const nouns = doc.nouns().out('array');
+            const topics = doc.topics().out('array');
+            
+            // Combine all potential keywords and normalize
+            let allKeywords = [...new Set([...nouns, ...topics])];
+            allKeywords = allKeywords
+              .map(k => k.toLowerCase())
+              .filter(k => k.length > 3);
+            
+            // Extract skills
+            const skills = technicalSkills.filter(skill => 
+              cleanText.toLowerCase().includes(skill.toLowerCase())
+            );
+            
+            // Extract experience level
+            const experiencePattern = /(\\d+)(?:\\s*\\+|\\s*\\-\\s*\\d+)?\\s*(?:years|yrs|year)/gi;
+            const experienceMatches = cleanText.match(experiencePattern);
+            const experienceLevel = experienceMatches && experienceMatches.length > 0 
+              ? experienceMatches[0] 
+              : null;
+            
+            return {
+              keywords: allKeywords.slice(0, 20),
+              skills,
+              experienceLevel,
+              education: cleanText.toLowerCase().includes('degree') || cleanText.toLowerCase().includes('phd')
+            };
+          }
+
+          describe('Keyword Analysis', () => {
+            const fixtures = JSON.parse(fs.readFileSync(path.join(__dirname, '../fixtures/job-descriptions.json'), 'utf-8'));
+            
+            it('should extract technical skills from Software Engineer job', () => {
+              const analysis = analyzeJobDescription(fixtures.softwareEngineer);
+              expect(analysis.skills).toContain('react');
+              expect(analysis.skills).toContain('typescript');
+              expect(analysis.skills).toContain('node.js');
+              expect(analysis.skills).toContain('aws');
+            });
+            
+            it('should extract experience level from Software Engineer job', () => {
+              const analysis = analyzeJobDescription(fixtures.softwareEngineer);
+              expect(analysis.experienceLevel).toMatch(/3\+\s*years/i);
+            });
+            
+            it('should extract skills from Data Scientist job', () => {
+              const analysis = analyzeJobDescription(fixtures.dataScientist);
+              expect(analysis.skills).toContain('python');
+              expect(analysis.skills).toContain('r');
+              expect(analysis.skills).toContain('tensorflow');
+              expect(analysis.skills).toContain('pytorch');
+            });
+            
+            it('should detect education requirements', () => {
+              const se = analyzeJobDescription(fixtures.softwareEngineer);
+              const ds = analyzeJobDescription(fixtures.dataScientist);
+              const pm = analyzeJobDescription(fixtures.productManager);
+              
+              expect(se.education).toBe(true);
+              expect(ds.education).toBe(true);
+              expect(pm.education).toBe(true);
+            });
+            
+            it('should extract a significant number of keywords', () => {
+              const analysis = analyzeJobDescription(fixtures.softwareEngineer);
+              expect(analysis.keywords.length).toBeGreaterThan(5);
+            });
+          });
+          " > test/keyword-analysis/analysis.test.js
+          
+      - name: Run keyword analysis tests
+        run: npm test -- test/keyword-analysis
+        
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: test-results/

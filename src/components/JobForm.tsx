@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link2, Loader2, X, AlertTriangle, Info } from 'lucide-react';
+import { useState } from 'react';
+import { Link2, Loader2, X, AlertTriangle, Info, RefreshCw } from 'lucide-react';
 import { ScrapedData } from '../types';
 
 // Define error types for better handling
@@ -21,6 +21,7 @@ export function JobForm({ onSubmit }: JobFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<ErrorState | null>(null);
   const [isValidUrl, setIsValidUrl] = useState(true);
+  const [bypassCache, setBypassCache] = useState(false);
 
   // Basic URL validation
   const validateUrl = (url: string): boolean => {
@@ -138,7 +139,10 @@ export function JobForm({ onSubmit }: JobFormProps) {
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ 
+          url,
+          bypass_cache: bypassCache 
+        }),
       });
 
       if (!response.ok) {
@@ -162,6 +166,7 @@ export function JobForm({ onSubmit }: JobFormProps) {
       
       onSubmit(url, data);
       setUrl('');
+      setBypassCache(false);
     } catch (err) {
       // Handle network errors
       setError({
@@ -182,39 +187,57 @@ export function JobForm({ onSubmit }: JobFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="w-full max-w-2xl">
-      <div className="flex gap-4">
-        <div className="flex-1">
-          <div className="relative">
-            <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5" />
-            <input
-              type="url"
-              value={url}
-              onChange={handleUrlChange}
-              placeholder="Paste job posting URL"
-              className={`w-full pl-10 pr-4 py-2 border ${!isValidUrl || error?.type === 'invalid_url' ? 'border-red-300 bg-red-50' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-              required
-            />
+      <div className="flex flex-col gap-4">
+        <div className="flex gap-4">
+          <div className="flex-1">
+            <div className="relative">
+              <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5" />
+              <input
+                type="url"
+                value={url}
+                onChange={handleUrlChange}
+                placeholder="Paste job posting URL"
+                className={`w-full pl-10 pr-4 py-2 border ${!isValidUrl || error?.type === 'invalid_url' ? 'border-red-300 bg-red-50' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                required
+              />
+            </div>
+            {!isValidUrl && url && (
+              <p className="mt-1 text-xs text-red-500">
+                Please enter a valid URL (e.g., https://example.com/job)
+              </p>
+            )}
           </div>
-          {!isValidUrl && url && (
-            <p className="mt-1 text-xs text-red-500">
-              Please enter a valid URL (e.g., https://example.com/job)
-            </p>
-          )}
+          <button
+            type="submit"
+            disabled={loading}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="animate-spin h-5 w-5" />
+                Scanning...
+              </>
+            ) : (
+              'Import Job'
+            )}
+          </button>
         </div>
-        <button
-          type="submit"
-          disabled={loading}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-        >
-          {loading ? (
-            <>
-              <Loader2 className="animate-spin h-5 w-5" />
-              Scanning...
-            </>
-          ) : (
-            'Import Job'
-          )}
-        </button>
+
+        <div className="flex items-center mt-1">
+          <label className="flex items-center text-sm text-gray-600 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={bypassCache}
+              onChange={() => setBypassCache(!bypassCache)}
+              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4 mr-2"
+            />
+            <RefreshCw className="h-3.5 w-3.5 text-gray-500 mr-1.5" />
+            Bypass cache (fetch fresh data)
+          </label>
+          <span className="ml-2 text-xs text-gray-500">
+            Use this if the job listing has changed recently
+          </span>
+        </div>
       </div>
       
       {error && (

@@ -13,6 +13,13 @@ export class GenericScraper extends BaseScraper {
   // This scraper can handle any URL (as a fallback)
   protected readonly domainPatterns = [/.*/];
   
+  // Override caching behavior - shorter TTL for generic scrapers
+  // since they might be less reliable
+  protected readonly cacheOptions = {
+    ttl_hours: 12, // 12-hour cache for generic scraper
+    bypass_cache: false
+  };
+  
   /**
    * Generic implementation uses the common extraction utilities
    */

@@ -5,9 +5,10 @@ export interface JobPosting {
   company: string;
   description: string;
   status: 'NEW' | 'APPLIED' | 'INTERVIEWING' | 'REJECTED' | 'ACCEPTED';
-  dateAdded: string;
-  dateModified: string;
+  date_added: string;
+  date_modified: string;
   notes: string;
+  user_id?: string;
 }
 
 export interface ScrapedData {

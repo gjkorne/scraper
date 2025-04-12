@@ -7,6 +7,7 @@ import { GenericScraper } from "./scrapers/GenericScraper.ts";
 import { ScrapedData } from "./types/index.ts";
 import { isValidUrl } from "./utils/fetch.ts";
 import { cleanJobData } from "./utils/html.ts";
+import { scraperCache } from "./utils/cache.ts";
 
 // Set up CORS headers
 const corsHeaders = {
@@ -26,9 +27,10 @@ const scraperFactory = new ScraperFactory()
  * Main function to handle scraping a job posting URL
  * 
  * @param url URL to scrape
+ * @param options Scraping options including bypass_cache
  * @returns Scraped job data
  */
-async function scrapeJobPosting(url: string): Promise<ScrapedData> {
+async function scrapeJobPosting(url: string, options?: { bypass_cache?: boolean }): Promise<ScrapedData> {
   // Validate URL format
   if (!isValidUrl(url)) {
     throw new Error('Invalid URL format. Please provide a valid job posting URL.');
@@ -42,6 +44,15 @@ async function scrapeJobPosting(url: string): Promise<ScrapedData> {
       type: 'UNSUPPORTED_PLATFORM'
     }));
   }
+  
+  // First check if we have a valid cache entry (unless bypass requested)
+  if (!options?.bypass_cache && scraperCache.isReady()) {
+    const cachedEntry = await scraperCache.get(url);
+    if (cachedEntry && !cachedEntry.is_expired) {
+      console.log(`Using cached data for ${url} (hit count: ${cachedEntry.cache_hit_count})`);
+      return cachedEntry.content;
+    }
+  }
 
   // Get the appropriate scraper for this URL
   const scraper = scraperFactory.getScraper(url);
@@ -49,7 +60,7 @@ async function scrapeJobPosting(url: string): Promise<ScrapedData> {
   
   // Try the specific scraper
   try {
-    const jobData = await scraper.scrape(url);
+    const jobData = await scraper.scrape(url, options);
     return cleanJobData(jobData);
   } catch (error) {
     // If the specific scraper fails and it's not the generic scraper,
@@ -59,7 +70,7 @@ async function scrapeJobPosting(url: string): Promise<ScrapedData> {
       
       try {
         const genericScraper = new GenericScraper();
-        const jobData = await genericScraper.scrape(url);
+        const jobData = await genericScraper.scrape(url, options);
         return cleanJobData(jobData);
       } catch (genericError) {
         throw new Error(`${error instanceof Error ? error.message : error}\n\nGeneric scraper also failed: ${genericError instanceof Error ? genericError.message : genericError}`);
@@ -80,7 +91,8 @@ Deno.serve(async (req) => {
 
   try {
     // Parse request body
-    const { url } = await req.json();
+    const requestData = await req.json();
+    const { url, bypass_cache } = requestData;
 
     if (!url) {
       return new Response(
@@ -89,8 +101,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Scrape the job posting
-    const jobData = await scrapeJobPosting(url);
+    // Scrape the job posting with caching options
+    const jobData = await scrapeJobPosting(url, { bypass_cache });
 
     // Return the scraped data
     return new Response(
