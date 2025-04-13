@@ -43,10 +43,10 @@ export function JobAnalysisPage() {
   });
 
   return (
-    <div className="container mx-auto py-6 px-4">
-      <h1 className="text-2xl font-bold mb-6">Job Analysis Dashboard</h1>
+    <div className="container mx-auto py-3 px-2">
+      <h1 className="text-1xl font-bold mb-3">Job Analysis Dashboard</h1>
       
-      <p className="text-gray-600 mb-6">
+      <p className="text-gray-600 mb-3">
         This dashboard provides analysis and visualization tools to help you understand job requirements and match them to your skills.
       </p>
       
@@ -58,7 +58,7 @@ export function JobAnalysisPage() {
         resumeId="resume-456" // Example resume ID
       />
       
-      <div className="mt-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
+      <div className="mt-8 p-4 bg-gray-50 rounded-sm border border-gray-200">
         <h2 className="text-lg font-semibold mb-2">How to Use This Dashboard</h2>
         <ol className="list-decimal pl-5 space-y-2">
           <li>

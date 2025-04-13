@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Briefcase, Loader2, FileText } from 'lucide-react';
+import { Briefcase, Loader2, FileText, Crosshair } from 'lucide-react';
 import { JobForm } from './components/JobForm';
 import { JobList } from './components/JobList';
 import { AuthForm } from './components/AuthForm';
 import { ResumesPage } from './pages/ResumesPage';
+import ResumeMatchTest from './pages/ResumeMatchTest';
 import { supabase } from './lib/supabase';
 import type { JobPosting, ScrapedData } from './types';
 import { User } from '@supabase/supabase-js';
@@ -13,7 +14,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState<'jobs' | 'resumes'>('jobs');
+  const [currentPage, setCurrentPage] = useState<'jobs' | 'resumes' | 'resume-match-test'>('jobs');
 
   useEffect(() => {
     // Check for existing session
@@ -169,6 +170,17 @@ function App() {
                       <FileText className="h-5 w-5 mr-1" />
                       Resumes
                     </button>
+                    <button
+                      onClick={() => setCurrentPage('resume-match-test')}
+                      className={`${
+                        currentPage === 'resume-match-test'
+                          ? 'border-blue-500 text-gray-900'
+                          : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                      } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
+                    >
+                      <Crosshair className="h-5 w-5 mr-1" />
+                      Resume Match Test
+                    </button>
                   </div>
                 </div>
                 <div className="flex items-center">
@@ -214,8 +226,10 @@ function App() {
                   </div>
                 )}
               </div>
-            ) : (
+            ) : currentPage === 'resumes' ? (
               <ResumesPage />
+            ) : (
+              <ResumeMatchTest />
             )
           ) : (
             <div className="text-center">

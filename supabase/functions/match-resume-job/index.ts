@@ -39,7 +39,38 @@ interface MatchResponse {
   recommendations: string[];
 }
 
-serve(async (req) => {
+interface ResumeContent {
+  skills?: {
+    list?: string[];
+  };
+  experience?: {
+    items?: Array<{
+      position?: string;
+      company?: string;
+      description?: string;
+    }>;
+  };
+  education?: {
+    items?: Array<{
+      institution?: string;
+      degree?: string;
+      description?: string;
+    }>;
+  };
+}
+
+interface UploadProgress {
+  loaded: number;
+  total: number;
+}
+
+// Define request type for HTTP server
+type Request = {
+  method: string;
+  json: () => Promise<any>;
+};
+
+serve(async (req: Request) => {
   // Handle CORS
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -86,7 +117,7 @@ serve(async (req) => {
     }
 
     // Extract resume content
-    const resumeContent = resumeData.content;
+    const resumeContent = resumeData.content as ResumeContent;
     const resumeText = resumeData.raw_text || JSON.stringify(resumeContent);
 
     // Extract job description
@@ -97,26 +128,29 @@ serve(async (req) => {
     // Perform the matching
     const match = await matchResumeToJob(resumeText, resumeContent, jobDescription, jobTitle, options);
 
+    // Create the match results object
+    const matchResult = {
+      resume_id: resumeId,
+      job_id: jobId,
+      match_score: match.overallScore,
+      match_details: {
+        keywordScore: match.keywordScore,
+        skillScore: match.skillScore,
+        experienceScore: match.experienceScore,
+        educationScore: match.educationScore,
+        keywordMatches: match.keywordMatches,
+        skillMatches: match.skillMatches,
+        missingKeywords: match.missingKeywords,
+        missingSkills: match.missingSkills,
+        recommendations: match.recommendations
+      },
+      created_at: new Date().toISOString()
+    };
+
     // Save match results to database
     const { data: matchData, error: matchError } = await supabase
       .from("resume_job_matches")
-      .upsert({
-        resume_id: resumeId,
-        job_id: jobId,
-        match_score: match.overallScore,
-        match_details: {
-          keywordScore: match.keywordScore,
-          skillScore: match.skillScore,
-          experienceScore: match.experienceScore,
-          educationScore: match.educationScore,
-          keywordMatches: match.keywordMatches,
-          skillMatches: match.skillMatches,
-          missingKeywords: match.missingKeywords,
-          missingSkills: match.missingSkills,
-          recommendations: match.recommendations
-        },
-        created_at: new Date().toISOString()
-      })
+      .upsert(matchResult)
       .select()
       .single();
 
@@ -124,13 +158,15 @@ serve(async (req) => {
       throw new Error(`Error saving match results: ${matchError.message}`);
     }
 
+    // Prepare the response, keeping resumeId and jobId for the frontend
+    const response: MatchResponse = {
+      resumeId,
+      jobId,
+      ...match
+    };
+
     return new Response(
-      JSON.stringify({
-        id: matchData.id,
-        resumeId,
-        jobId,
-        ...match
-      }),
+      JSON.stringify(response),
       {
         headers: {
           ...corsHeaders,
@@ -138,12 +174,13 @@ serve(async (req) => {
         }
       }
     );
-  } catch (error) {
-    console.error("Error matching resume to job:", error);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    console.error("Error matching resume to job:", errorMessage);
 
     return new Response(
       JSON.stringify({
-        error: error.message || "An error occurred while matching resume to job"
+        error: errorMessage
       }),
       {
         status: 400,
@@ -159,7 +196,7 @@ serve(async (req) => {
 // Main matching function
 async function matchResumeToJob(
   resumeText: string,
-  resumeContent: any,
+  resumeContent: ResumeContent,
   jobDescription: string,
   jobTitle: string,
   options: any
@@ -223,8 +260,18 @@ async function matchResumeToJob(
   };
 }
 
+interface Keyword {
+  text: string;
+  importance: number;
+}
+
+interface Skill {
+  text: string;
+  importance: number;
+}
+
 // Extract keywords from job description
-function extractKeywords(jobDescription: string, jobTitle: string): Array<{text: string, importance: number}> {
+function extractKeywords(jobDescription: string, jobTitle: string): Keyword[] {
   // Normalize text
   const text = jobDescription.toLowerCase();
   
@@ -277,7 +324,7 @@ function calculateImportance(word: string, count: number, jobTitle: string): num
 }
 
 // Extract skills from job description
-function extractSkills(jobDescription: string): Array<{text: string, importance: number}> {
+function extractSkills(jobDescription: string): Skill[] {
   // Common technical skills
   const technicalSkills = [
     "javascript", "typescript", "python", "java", "c#", "c++", "ruby", "go", "php", "swift",
@@ -341,7 +388,7 @@ function calculateSkillImportance(skill: string, jobText: string): number {
 }
 
 // Match keywords in resume
-function matchKeywords(resumeText: string, keywords: Array<{text: string, importance: number}>): KeywordMatch[] {
+function matchKeywords(resumeText: string, keywords: Keyword[]): KeywordMatch[] {
   const normalizedText = resumeText.toLowerCase();
   
   return keywords.map(keyword => {
@@ -368,8 +415,8 @@ function matchKeywords(resumeText: string, keywords: Array<{text: string, import
 // Match skills in resume
 function matchSkills(
   resumeText: string, 
-  resumeContent: any, 
-  skills: Array<{text: string, importance: number}>
+  resumeContent: ResumeContent, 
+  skills: Skill[]
 ): SkillMatch[] {
   const normalizedText = resumeText.toLowerCase();
   
@@ -419,7 +466,7 @@ function calculateSkillScore(skillMatches: SkillMatch[]): number {
 }
 
 // Calculate experience match score based on years and relevance (0-100)
-function calculateExperienceMatch(resumeContent: any, jobDescription: string): number {
+function calculateExperienceMatch(resumeContent: ResumeContent, jobDescription: string): number {
   // Default to a middle score if we can't calculate
   if (!resumeContent.experience?.items) return 50;
   
@@ -450,7 +497,7 @@ function calculateExperienceMatch(resumeContent: any, jobDescription: string): n
       }
       
       // For each important word in the description, check if it's in the job
-      const descWords = description.split(/\s+/).filter(w => w.length > 5);
+      const descWords = description.split(/\s+/).filter((w: string) => w.length > 5);
       for (const word of descWords) {
         if (jobText.includes(word)) {
           relevanceScore += 2;
@@ -472,7 +519,7 @@ function calculateExperienceMatch(resumeContent: any, jobDescription: string): n
 }
 
 // Calculate education match score (0-100)
-function calculateEducationMatch(resumeContent: any, jobDescription: string): number {
+function calculateEducationMatch(resumeContent: ResumeContent, jobDescription: string): number {
   // Default to a middle score if we can't calculate
   if (!resumeContent.education?.items) return 50;
   
@@ -493,13 +540,13 @@ function calculateEducationMatch(resumeContent: any, jobDescription: string): nu
     const hasPhDRequirement = /phd|doctorate|doctoral/i.test(jobDescription);
     
     // Check if resume has matching education
-    const hasBachelor = educationItems.some(item => 
+    const hasBachelor = educationItems.some((item: any) => 
       /bachelor|bs|ba|b\.s\.|b\.a\.|undergraduate/i.test(item.degree || ""));
       
-    const hasMaster = educationItems.some(item => 
+    const hasMaster = educationItems.some((item: any) => 
       /master|ms|ma|m\.s\.|m\.a\.|graduate/i.test(item.degree || ""));
       
-    const hasPhD = educationItems.some(item => 
+    const hasPhD = educationItems.some((item: any) => 
       /phd|doctorate|doctoral/i.test(item.degree || ""));
     
     // Calculate base score

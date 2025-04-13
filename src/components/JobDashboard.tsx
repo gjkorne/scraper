@@ -60,15 +60,15 @@ export function JobDashboard({
   }, [jobId]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-1">
       <Card>
         <CardHeader>
-          <CardTitle className="text-xl">{jobTitle}</CardTitle>
+          <CardTitle className="text-sm">{jobTitle}</CardTitle>
           <CardDescription>{companyName}</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-1">
               <TabsTrigger value="analysis" className="flex items-center">
                 <ClipboardList className="h-4 w-4 mr-2" />
                 Analysis
@@ -83,7 +83,7 @@ export function JobDashboard({
               </TabsTrigger>
             </TabsList>
             
-            <TabsContent value="analysis" className="mt-4">
+            <TabsContent value="analysis" className="mt-1">
               <JobAnalysis 
                 jobId={jobId}
                 jobTitle={jobTitle}
@@ -92,7 +92,7 @@ export function JobDashboard({
               />
             </TabsContent>
             
-            <TabsContent value="visualizations" className="mt-4">
+            <TabsContent value="visualizations" className="mt-1">
               {isAnalysisComplete ? (
                 <JobAnalysisVisualizations
                   analysisId={analysisId}
