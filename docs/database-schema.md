@@ -484,6 +484,84 @@ CREATE POLICY "Users can update their own AI settings"
   WITH CHECK (auth.uid() = user_id);
 ```
 
+### 12. Resume Job Matches Table
+
+This table stores detailed matching analysis between resumes and job descriptions.
+
+```sql
+CREATE TABLE IF NOT EXISTS resume_job_matches (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  resume_id uuid REFERENCES resumes(id) ON DELETE CASCADE NOT NULL,
+  job_id uuid REFERENCES jobs(id) ON DELETE CASCADE NOT NULL,
+  match_score integer NOT NULL, -- Overall match score (0-100)
+  match_details jsonb DEFAULT '{}', -- Detailed match results
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  
+  CONSTRAINT unique_resume_job_match UNIQUE (resume_id, job_id)
+);
+
+-- RLS Policies
+ALTER TABLE resume_job_matches ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own resume-job matches"
+  ON resume_job_matches
+  FOR SELECT
+  TO authenticated
+  USING (EXISTS (
+    SELECT 1 FROM resumes 
+    WHERE resumes.id = resume_job_matches.resume_id 
+    AND resumes.user_id = auth.uid()
+  ));
+
+CREATE POLICY "Users can create their own resume-job matches"
+  ON resume_job_matches
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM resumes 
+    WHERE resumes.id = resume_job_matches.resume_id 
+    AND resumes.user_id = auth.uid()
+  ));
+
+CREATE POLICY "Users can update their own resume-job matches"
+  ON resume_job_matches
+  FOR UPDATE
+  TO authenticated
+  USING (EXISTS (
+    SELECT 1 FROM resumes 
+    WHERE resumes.id = resume_job_matches.resume_id 
+    AND resumes.user_id = auth.uid()
+  ))
+  WITH CHECK (EXISTS (
+    SELECT 1 FROM resumes 
+    WHERE resumes.id = resume_job_matches.resume_id 
+    AND resumes.user_id = auth.uid()
+  ));
+
+CREATE POLICY "Users can delete their own resume-job matches"
+  ON resume_job_matches
+  FOR DELETE
+  TO authenticated
+  USING (EXISTS (
+    SELECT 1 FROM resumes 
+    WHERE resumes.id = resume_job_matches.resume_id 
+    AND resumes.user_id = auth.uid()
+  ));
+```
+
+The `match_details` jsonb field stores detailed matching information including:
+
+- `keywordScore`: Matching score for keywords in job description (0-100)
+- `skillScore`: Matching score for technical and soft skills (0-100)
+- `experienceScore`: Score for relevant experience (0-100)
+- `educationScore`: Score for relevant education (0-100)
+- `keywordMatches`: Array of keywords found in the resume
+- `skillMatches`: Array of skills found in the resume
+- `missingKeywords`: Keywords from job description not found in resume
+- `missingSkills`: Skills from job description not found in resume
+- `recommendations`: Suggestions for improving the resume match
+
 ## Entity Relationship Diagram
 
 The following diagram illustrates the relationships between tables in the expanded schema:

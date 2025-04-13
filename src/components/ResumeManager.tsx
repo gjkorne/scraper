@@ -13,9 +13,18 @@ import {
   Plus,
   RefreshCw
 } from 'lucide-react';
-import { Button, ButtonProps } from './ui/Button';
+import { Button } from './ui/Button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from './ui/Card';
 import { ResumeUpload } from './ResumeUpload';
+import { Json } from '../types/database.types';
+
+// Use a module augmentation to extend ButtonProps
+declare module './ui/Button' {
+  interface ButtonProps {
+    variant?: 'default' | 'outline' | 'secondary' | 'destructive' | 'ghost' | 'link';
+    size?: 'default' | 'sm' | 'lg' | 'icon';
+  }
+}
 
 interface Resume {
   id: string;
@@ -29,7 +38,7 @@ interface Resume {
   updated_at: string;
   is_active: boolean;
   versions?: ResumeVersion[];
-  current_version?: ResumeVersion;
+  current_version?: Omit<ResumeVersion, 'resume_id'>;
 }
 
 interface ResumeVersion {
@@ -37,7 +46,7 @@ interface ResumeVersion {
   resume_id: string;
   version_number: number;
   version_name: string | null;
-  content: any;
+  content: Json;
   raw_text?: string;
   created_at: string;
   created_for_job_id: string | null;
@@ -102,7 +111,7 @@ export function ResumeManager() {
     }
   };
   
-  const handleUploadComplete = async (_resumeId: string) => {
+  const handleUploadComplete = async () => {
     setShowUpload(false);
     await fetchResumes();
   };
@@ -215,7 +224,7 @@ export function ResumeManager() {
     }
   };
   
-  const setCurrentVersion = async (_resumeId: string, versionId: string) => {
+  const setCurrentVersion = async (versionId: string) => {
     try {
       // Update the version to be current
       const { error } = await supabase
@@ -362,7 +371,7 @@ export function ResumeManager() {
                           <Button 
                             variant="outline" 
                             size="sm"
-                            onClick={() => setCurrentVersion(selectedResume.id, version.id)}
+                            onClick={() => setCurrentVersion(version.id)}
                           >
                             <CheckCircle2 className="h-4 w-4 mr-1" />
                             Set as Current
