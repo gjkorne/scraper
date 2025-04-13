@@ -156,6 +156,41 @@ Each scraper function (`scrapeLinkedIn`, `scrapeGreenhouse`, etc.) contains near
 
 ---
 
+### 8. TypeScript and Linting Issues (High Priority)
+
+**Problem:**
+Current IDE errors and warnings:
+- `ResumeManager.tsx`: Type incompatibilities between Supabase return types and React component interfaces
+  - Type errors in Resume and ResumeVersion interfaces (missing `resume_id` property)
+  - Type `{ variant: string, size: string }` props not assignable to Button component (8 occurrences)
+- `ResumesPage.tsx`: Button component type errors (6 occurrences)
+- `App.tsx`: Unused 'React' import
+- `CI.yml`: Invalid context access for `SUPABASE_PROJECT_REF` and `SUPABASE_ACCESS_TOKEN`
+- Unused variables in ResumeManager components: `resumeId`, `fileType`
+
+**Impact:**
+- TypeScript compilation errors prevent reliable builds
+- Potential runtime errors due to type mismatches
+- Reduced code reliability and maintainability
+- Confusing developer experience with irrelevant warnings
+
+**Solution:**
+1. Button Component:
+   - Update Button component interface to include `variant` and `size` props
+   - Define proper prop types for these attributes
+
+2. Resume Interface Fixes:
+   - Correct Resume and ResumeVersion interfaces
+   - Ensure proper typing for Supabase query results
+
+3. Cleanup:
+   - Remove unused imports and variables
+   - Fix GitHub Actions workflow variables
+
+**Estimated Effort:** 4-6 hours
+
+---
+
 ## Implementation Plan
 
 ### Week 1 (April 12-19, 2025)
@@ -179,6 +214,13 @@ Each scraper function (`scrapeLinkedIn`, `scrapeGreenhouse`, etc.) contains near
 - Document database schema
 - Enhance frontend error states
 
+### Week 2 (April 20-26, 2025)
+
+**Day 1-2:**
+- Address item #8 (TypeScript and Linting Issues)
+- Fix TypeScript errors and warnings
+- Address linting issues and enforce consistent coding style
+
 ## Progress Tracking
 
 | Item | Status | Completion Date | Notes |
@@ -190,3 +232,4 @@ Each scraper function (`scrapeLinkedIn`, `scrapeGreenhouse`, etc.) contains near
 | 5. No Abstraction for Fetch | Completed | April 12, 2025 | Created fetchWithRetry utility in utils/fetch.ts |
 | 6. Limited Schema Documentation | Completed | April 12, 2025 | Created comprehensive database-schema.md with current and planned schema |
 | 7. Frontend Error State Management | Completed | April 12, 2025 | Enhanced JobForm component with detailed error types, validation, and user-friendly feedback |
+| 8. TypeScript and Linting Issues | Not Started | - | Scheduled for Week 2 |

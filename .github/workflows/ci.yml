@@ -72,11 +72,18 @@ jobs:
         uses: supabase/setup-cli@v1
         
       - name: Deploy to Supabase Preview Environment
-        # NOTE: SUPABASE_PROJECT_REF and SUPABASE_ACCESS_TOKEN must be set in GitHub repository secrets
-        # These warnings are expected during local development and will resolve in the GitHub environment
-        run: supabase functions deploy scrape-job --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} --env preview
+        # IMPORTANT: The following environment variables must be configured as repository secrets in GitHub:
+        # - SUPABASE_PROJECT_REF: Your Supabase project reference ID
+        # - SUPABASE_ACCESS_TOKEN: Your Supabase access token
+        # 
+        # NOTE: IDE warnings about "Context access might be invalid" can be safely ignored.
+        # These are expected during local development and will work correctly in the GitHub Actions environment.
+        run: |
+          supabase functions deploy scrape-job \
+            --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}" \
+            --env preview
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_ACCESS_TOKEN: "${{ secrets.SUPABASE_ACCESS_TOKEN }}"
           
   deploy_production:
     name: Deploy Production
@@ -96,8 +103,14 @@ jobs:
         uses: supabase/setup-cli@v1
         
       - name: Deploy to Supabase Production
-        # NOTE: SUPABASE_PROJECT_REF and SUPABASE_ACCESS_TOKEN must be set in GitHub repository secrets
-        # These warnings are expected during local development and will resolve in the GitHub environment
-        run: supabase functions deploy scrape-job --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+        # IMPORTANT: The following environment variables must be configured as repository secrets in GitHub:
+        # - SUPABASE_PROJECT_REF: Your Supabase project reference ID
+        # - SUPABASE_ACCESS_TOKEN: Your Supabase access token
+        # 
+        # NOTE: IDE warnings about "Context access might be invalid" can be safely ignored.
+        # These are expected during local development and will work correctly in the GitHub Actions environment.
+        run: |
+          supabase functions deploy scrape-job \
+            --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_ACCESS_TOKEN: "${{ secrets.SUPABASE_ACCESS_TOKEN }}"

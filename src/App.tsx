@@ -1,16 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { Briefcase, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Briefcase, Loader2, FileText } from 'lucide-react';
 import { JobForm } from './components/JobForm';
 import { JobList } from './components/JobList';
 import { AuthForm } from './components/AuthForm';
+import { ResumesPage } from './pages/ResumesPage';
 import { supabase } from './lib/supabase';
 import type { JobPosting, ScrapedData } from './types';
+import { User } from '@supabase/supabase-js';
 
 function App() {
   const [jobs, setJobs] = useState<JobPosting[]>([]);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState<'jobs' | 'resumes'>('jobs');
 
   useEffect(() => {
     // Check for existing session
@@ -134,20 +137,64 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <div className="flex flex-col items-center gap-8">
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-3">
-                <Briefcase className="h-8 w-8 text-blue-600" />
-                <h1 className="text-3xl font-bold text-gray-900">Job Application Tracker</h1>
+        {user && (
+          <nav className="bg-white shadow-sm mb-6 rounded-lg">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between h-16">
+                <div className="flex">
+                  <div className="flex-shrink-0 flex items-center">
+                    <Briefcase className="h-8 w-8 text-blue-600" />
+                    <span className="ml-2 text-xl font-bold">Job Tracker</span>
+                  </div>
+                  <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
+                    <button
+                      onClick={() => setCurrentPage('jobs')}
+                      className={`${
+                        currentPage === 'jobs'
+                          ? 'border-blue-500 text-gray-900'
+                          : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                      } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
+                    >
+                      <Briefcase className="h-5 w-5 mr-1" />
+                      Jobs
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage('resumes')}
+                      className={`${
+                        currentPage === 'resumes'
+                          ? 'border-blue-500 text-gray-900'
+                          : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                      } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
+                    >
+                      <FileText className="h-5 w-5 mr-1" />
+                      Resumes
+                    </button>
+                  </div>
+                </div>
+                <div className="flex items-center">
+                  <button
+                    onClick={() => supabase.auth.signOut()}
+                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                  >
+                    Sign Out
+                  </button>
+                </div>
               </div>
-              <p className="mt-2 text-gray-600">
-                Import job postings and track your applications in one place
-              </p>
             </div>
-            
-            {user ? (
-              <>
+          </nav>
+        )}
+
+        <div className="px-4 py-6 sm:px-0">
+          {user ? (
+            currentPage === 'jobs' ? (
+              <div className="flex flex-col items-center gap-8">
+                <div className="text-center">
+                  <h1 className="text-3xl font-bold text-gray-900">Job Application Tracker</h1>
+                  <p className="mt-2 text-gray-600">
+                    Import job postings and track your applications in one place
+                  </p>
+                </div>
+                
                 <JobForm onSubmit={handleJobSubmit} />
                 
                 {loading ? (
@@ -166,13 +213,22 @@ function App() {
                     <p>No jobs added yet. Start by pasting a job posting URL above.</p>
                   </div>
                 )}
-              </>
-            ) : (
-              <div className="text-center">
-                <AuthForm />
               </div>
-            )}
-          </div>
+            ) : (
+              <ResumesPage />
+            )
+          ) : (
+            <div className="text-center">
+              <div className="flex items-center justify-center gap-3">
+                <Briefcase className="h-8 w-8 text-blue-600" />
+                <h1 className="text-3xl font-bold text-gray-900">Job Application Tracker</h1>
+              </div>
+              <p className="mt-2 text-gray-600">
+                Sign in to manage your job applications and resumes
+              </p>
+              <AuthForm />
+            </div>
+          )}
         </div>
       </div>
     </div>
